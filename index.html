@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calculadora</title>
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="calculator-container">
+        <div class="calculator">
+            <div class="display">
+                <input type="text" id="operations" autofocus>
+            </div>
+            <div class="buttons">
+                <button id="clear" onclick="clearResult()">C</button>
+                <button id="backspace" onclick="backspace()">←</button>
+                <button id="plus" onclick="insert('+')">+</button>
+                <button id="minus" onclick="insert('-')">-</button>
+                <button id="times" onclick="insert('*')">*</button>
+                <button id="divide" onclick="insert('/')">/</button>
+                <button id="seven" onclick="insert('7')">7</button>
+                <button id="eight" onclick="insert('8')">8</button>
+                <button id="nine" onclick="insert('9')">9</button>
+                <button id="four" onclick="insert('4')">4</button>
+                <button id="five" onclick="insert('5')">5</button>
+                <button id="six" onclick="insert('6')">6</button>
+                <button id="one" onclick="insert('1')">1</button>
+                <button id="two" onclick="insert('2')">2</button>
+                <button id="three" onclick="insert('3')">3</button>
+                <button id="zero" onclick="insert('0')">0</button>
+                <button id="point" onclick="insert('.')">.</button>
+                <button id="calculate" onclick="calculate()">=</button>
+            </div>
+        </div>
+        <div class="calculator-history">
+            <h2>Histórico</h2>
+            <ul id="history-list"></ul>
+        </div>
+    </div>
+    <script src="js/script.js"></script>
+</body>
+
+</html>
