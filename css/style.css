@@ -68,7 +68,7 @@ body {
   }
 
   .calculator-history {
-    width: 200px;
+    width: 300px;
   }
 
   .calculator-history .history-list {
@@ -78,6 +78,7 @@ body {
   
   .calculator-history h2 {
     margin-top: 0;
+    margin-bottom: 10px;
   }
   
   .calculator-history ul {
@@ -89,8 +90,11 @@ body {
   }
   
   .calculator-history li {
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-size: 14px;
+    background-color: #2b2b2b;
+    padding: 4px 4px 4px 8px;
+    border-radius: 6px;
   }
   
   .calculator-history button {

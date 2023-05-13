@@ -2,6 +2,7 @@ const result = document.getElementById("operations");
 const historyList = document.getElementById("history-list");
 const history = [];
 const operations = ["+", "-", "/", "*"];
+const points = [",", "."];
 const regex = new RegExp(`[${operations.join("")}]`, "g");
 let operationFinished = false;
 
@@ -11,6 +12,7 @@ result.addEventListener("keypress", function (event) {
 
 function insert(num) {
   if (operations.includes(num) && !canAddOperators()) return;
+  if (points.includes(num) && !canAddPoints()) return;
   handleFirstCalculation(num);
   result.value += num;
 }
@@ -24,13 +26,14 @@ function backspace() {
 }
 
 function calculate() {
-  clearTheValueForCalculation();
+  if (operationFinished) return;
 
+  if (mountCount().length <= 1) return;
+  clearTheValueForCalculation();
   let expression = result.value;
   if (expression) {
     try {
       let operationResult = eval(expression);
-      operationFinished = true;
       if (operationResult == Infinity || operationResult === -Infinity) {
         operationResult = "Divisão por 0";
       }
@@ -39,6 +42,8 @@ function calculate() {
     } catch (error) {
       console.log(error);
       result.value = "Error";
+    } finally {
+      operationFinished = true;
     }
   }
 }
@@ -50,12 +55,16 @@ const handleAdd = (event) => {
   let allowedKeys = [13, 43, 45, 42, 47, 44, 46];
 
   let regex = /^\d+([\.,]\d+)?([+\-*/]\d+([\.,]\d+)?)*$/;
-  console.log("Regex result: ", regex.test(result.value + character));
   if (!regex.test(result.value + character) && !allowedKeys.includes(key)) {
     event.preventDefault();
   }
 
   if (allowedKeys.includes(key) && !canAddOperators()) {
+    event.preventDefault();
+    return;
+  }
+
+  if (points.includes(character) && !canAddPoints()) {
     event.preventDefault();
     return;
   }
@@ -75,6 +84,7 @@ const clearTheValueForCalculation = () => {
 };
 
 const canAddOperators = () => {
+  if (operations.includes(result.value.slice(-1)) || points.includes(result.value.slice(-1))) return false;
   if (mountCount().length >= 1) {
     return true;
   }
@@ -104,4 +114,9 @@ const handleFirstCalculation = (value) => {
     result.value = "";
   }
   operationFinished = false;
+};
+
+const canAddPoints = () => {
+  if (points.includes(result.value.slice(-1)) || operations.includes(result.value.slice(-1))) return false;
+  return true;
 };
