@@ -9,12 +9,24 @@ const divide = (val1, val2) => {
   }
   return val1 / val2;
 };
+const firstInput = document.getElementById("first-input");
+const secondInput = document.getElementById("second-input");
+
+const validateInput = (input) => {
+  if (input === "E" || input === "e") return false;
+  return true;
+};
+
+firstInput.addEventListener("keypress", function (evt) {
+  if (!validateInput(evt.key)) evt.preventDefault();
+});
+
+secondInput.addEventListener("keypress", function (evt) {
+  if (!validateInput(evt.key)) evt.preventDefault();
+});
 
 const handleOperation = (e) => {
   const { name } = e.target;
-
-  const firstInput = document.getElementById("first-input");
-  const secondInput = document.getElementById("second-input");
 
   if (firstInput.value.trim() === "") {
     alert("Informe o primeiro valor para calcular");
