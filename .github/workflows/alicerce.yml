@@ -1,0 +1,134 @@
+# Managed by Alicerce by Malha
+name: Alicerce by Malha Knowledge Sync
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+  push:
+    branches-ignore:
+      - 'alicerce/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Alicerce by Malha Knowledge Sync
+    # Ignora PRs abertos pelo próprio Alicerce by Malha (branches alicerce/*) para evitar ciclo infinito
+    if: ${{ !startsWith(github.head_ref || github.ref_name, 'alicerce/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Alicerce by Malha secrets
+        shell: bash
+        run: |
+          test -n "${{ secrets.ALICERCE_API_URL }}" || (echo "ALICERCE_API_URL secret is missing" && exit 1)
+          test -n "${{ secrets.ALICERCE_API_KEY }}" || (echo "ALICERCE_API_KEY secret is missing" && exit 1)
+
+      - name: Resolve PR context
+        id: pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          AFTER: ${{ github.sha }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number }}
+        run: |
+          pr_number=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            pr_number="$PR_FROM_EVENT"
+          elif [ "$REF_NAME" != "master" ]; then
+            pr_number="$(gh api "repos/${REPO}/commits/${AFTER}/pulls" --jq 'map(select(.state=="open"))[0].number // ""' 2>/dev/null || true)"
+          fi
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
+          if [ -n "$pr_number" ]; then
+            echo "Resolved PR #${pr_number}"
+          else
+            echo "No open PR resolved"
+          fi
+
+      - name: Get changed files
+        id: diff
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          files=""
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$PR_NUMBER" ]; then
+            files="$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename' 2>/dev/null | paste -sd, - || true)"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            files="$(gh api "repos/${REPO}/compare/${BEFORE}...${AFTER}" --jq '[.files[].filename] | join(",")' 2>/dev/null || true)"
+          fi
+          if [ -z "$files" ] && [ -n "$PR_NUMBER" ]; then
+            files="$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename' 2>/dev/null | paste -sd, - || true)"
+          fi
+          echo "files=${files}" >> "$GITHUB_OUTPUT"
+
+      - name: Analyze diff (PR branch)
+        id: analyze
+        if: steps.diff.outputs.files != '' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_name != 'master' && steps.pr.outputs.pr_number != ''))
+        shell: bash
+        env:
+          ALICERCE_API_URL: ${{ secrets.ALICERCE_API_URL }}
+          ALICERCE_API_KEY: ${{ secrets.ALICERCE_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          FILES: ${{ steps.diff.outputs.files }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          files_json=$(python3 -c "import sys,json; print(json.dumps(sys.argv[1].split(',')))" "${FILES}")
+          response="$(curl -fsS -X POST "${ALICERCE_API_URL}/jobs" \
+            -H "Authorization: Bearer ${ALICERCE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\
+              \"job_type\":\"analyze_diff\",\
+              \"payload\":{\
+                \"repo\":\"${REPO_NAME}\",\
+                \"branch\":\"${BRANCH}\",\
+                \"pr_number\":${PR_NUMBER},\
+                \"changed_files\":${files_json}\
+              }\
+            }")"
+          echo "$response"
+          job_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$response")"
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "Alicerce by Malha analyze_diff enqueued: $job_id"
+          echo "Diff analysis will run asynchronously in Alicerce by Malha."
+
+      - name: Update docs after merge (push only)
+        if: github.event_name == 'push' && github.ref_name == 'master' && steps.diff.outputs.files != ''
+        shell: bash
+        env:
+          ALICERCE_API_URL: ${{ secrets.ALICERCE_API_URL }}
+          ALICERCE_API_KEY: ${{ secrets.ALICERCE_API_KEY }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.ref_name }}
+          FILES: ${{ steps.diff.outputs.files }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          files_json=$(python3 -c "import sys,json; print(json.dumps(sys.argv[1].split(',')))" "${FILES}")
+          curl -fsS -X POST "${ALICERCE_API_URL}/jobs" \
+            -H "Authorization: Bearer ${ALICERCE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\
+              \"job_type\":\"update_docs_diff\",\
+              \"payload\":{\
+                \"repo\":\"${REPO_NAME}\",\
+                \"branch\":\"${BRANCH}\",\
+                \"commit_sha\":\"${COMMIT_SHA}\",\
+                \"changed_files\":${files_json}\
+              }\
+            }"
